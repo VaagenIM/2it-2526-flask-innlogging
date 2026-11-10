@@ -3,7 +3,7 @@ FROM python:3.11-slim
 
 COPY requirements.txt .
 RUN pip install -r requirements.txt
-COPY . .
+COPY src/* .
 
 EXPOSE 5000
-CMD ["python", "run.py"]
+CMD ["python", "main.py"]
