@@ -5,7 +5,7 @@
 
 from pprint import pprint
 
-from flask import Flask, render_template, request, redirect, session
+from flask import Flask, redirect, render_template, request, session
 
 from decorators import login_required
 from logger import logger
@@ -66,9 +66,9 @@ def post_login():
     logger.debug(user)
     if not user or not user.check_password(request.form.get("password")):
         logger.info("Feil passord")
-        return render_template("login.html",
-                               error_msg="Feil brukernavn eller passord.",
-                               form=request.form)
+        return render_template(
+            "login.html", error_msg="Feil brukernavn eller passord.", form=request.form
+        )
     logger.info("Riktig passord")
     session["user"] = user
     session["logged_in"] = True
@@ -88,4 +88,4 @@ def comment(post_id):
 if __name__ == "__main__":
     logger.info("App started.")
     logger.debug(app.debug)
-    app.run(debug=True)
+    app.run(host="0.0.0.0")
