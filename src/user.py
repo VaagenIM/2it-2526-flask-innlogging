@@ -87,3 +87,17 @@ def init_db():
     conn.close()
 
 init_db()
+
+import hashlib
+
+def get_bucket(username, prefix_len=4):
+    h = hashlib.blake2b(username.encode(), digest_size=16).hexdigest()
+    return h[:prefix_len]
+
+
+x,y,*var,z = ("sondre", "tymon", "hei", "hallo", "jacob")
+
+print(var)
+print(x, get_bucket(x))
+print(y, get_bucket(y))
+print(z, get_bucket(z))

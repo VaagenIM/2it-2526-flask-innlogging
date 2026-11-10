@@ -1,0 +1,76 @@
+name: Publish container
+
+on:
+  # Bygg og publiser ved push til alle brancher.
+  push:
+  # Gjør det også mulig å starte workflowen manuelt.
+  workflow_dispatch:
+
+env:
+  # GitHub Container Registry.
+  REGISTRY: ghcr.io
+  # Bygg imaget for både vanlige servere og ARM-enheter.
+  PLATFORMS: linux/amd64,linux/arm64/v8
+
+jobs:
+  build-and-push:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    permissions:
+      # Workflowen trenger å lese kildekoden og skrive til GHCR.
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        # Henter kildekoden slik at workflowen kan bygge Dockerfile.
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        # Gjør det mulig å bygge images for andre CPU-arkitekturer enn runneren.
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        # Buildx støtter multi-platform builds og avansert caching.
+        uses: docker/setup-buildx-action@v4
+
+      - name: Set image name
+        id: image
+        # GITHUB_REPOSITORY er en innebygd GitHub-variabel med eier/repository.
+        run: echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        # Bruker GitHub Actions-tokenet som allerede finnes i secrets.GITHUB_TOKEN.
+        # Tokenet får skrive image til GHCR gjennom packages: write over.
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          # github.actor er brukeren eller boten som startet workflowen.
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        # Lager image-tags og labels basert på branch og repository.
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
+          # main og master bruker produksjonstaggen (:latest).
+          # Alle andre brancher bruker utviklingstaggen (:edge).
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+            type=raw,value=edge,enable=${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
+
+      - name: Build and push image
+        # Bygger Dockerfile, lager images for plattformene over og publiserer dem.
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Gjenbruk lag fra tidligere kjøringer for raskere bygging.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
